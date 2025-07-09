@@ -31,11 +31,7 @@ def is_tracking_time():
 
 
 def is_upload_time():
-    now = datetime.datetime.now(TIMEZONE)
-    return (
-        now.hour == 15 and now.minute == 0 and
-        now.weekday() in [3, 6]
-    )
+    return True  # Force immediate upload — for testing only
 
 def now_london():
     return datetime.datetime.now(TIMEZONE)
