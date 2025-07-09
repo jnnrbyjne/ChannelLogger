@@ -132,3 +132,14 @@ async def send_log_file():
     final_log.clear()
 
 client.run(BOT_TOKEN)
+
+# FORCING LOG UPLOAD (FOR TESTING ONLY)
+import asyncio
+
+async def force_upload():
+    await client.wait_until_ready()
+    await finalize_log()
+    await send_log_file()
+
+client.loop.create_task(force_upload())
+
