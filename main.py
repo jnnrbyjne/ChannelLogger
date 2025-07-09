@@ -1,3 +1,17 @@
+from dotenv import load_dotenv
+import os
+
+print("🚀 Script started...")
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+LOG_CHANNEL_ID = os.getenv("LOG_CHANNEL_ID")
+
+print(f"🔐 BOT_TOKEN loaded: {'✅' if BOT_TOKEN else '❌ MISSING!'}")
+print(f"📺 LOG_CHANNEL_ID loaded: {LOG_CHANNEL_ID}")
+
+
 import discord
 import datetime
 import asyncio
@@ -80,3 +94,13 @@ class GVGLogger(discord.Client):
 # ====== Run Bot ======
 client = GVGLogger(intents=intents)
 client.run(BOT_TOKEN)
+
+import asyncio
+
+async def main():
+    try:
+        await client.start(BOT_TOKEN)
+    except Exception as e:
+        print(f"❌ Bot startup failed: {e}")
+
+asyncio.run(main())
