@@ -11,7 +11,7 @@ load_dotenv()
 # ====== CONFIG ======
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
-Bonding_sa_Conste = "Test Channel"  # TEMP for testing
+VOICE_CHANNEL_NAME = "Bonding sa Conste"
 TIMEZONE = pytz.timezone("Europe/London")
 
 # ====== TRACKING DATA ======
