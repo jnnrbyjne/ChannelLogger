@@ -16,7 +16,7 @@ intents.members = True
 client = discord.Client(intents=intents)
 
 # === CONFIGURATION ===
-VOICE_CHANNEL_NAME = "GVG"
+VOICE_CHANNEL_NAME = "Bonding sa Conste"
 TIMEZONE = pytz.timezone("Europe/London")
 
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
@@ -27,11 +27,8 @@ final_log = {}
 has_logged_today = False
 
 def is_tracking_time():
-    now = datetime.datetime.now(TIMEZONE)
-    return (
-        now.hour == 14 and
-        now.weekday() in [3, 6]  # Thursday (3), Sunday (6)
-    )
+    return True  # Always track — for testing only
+
 
 def is_upload_time():
     now = datetime.datetime.now(TIMEZONE)
