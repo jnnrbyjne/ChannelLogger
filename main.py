@@ -1,5 +1,6 @@
 import discord
-import asyncio
+from discord import app_commands
+from discord.ext import commands
 import datetime
 import pytz
 import csv
@@ -13,47 +14,60 @@ intents.voice_states = True
 intents.guilds = True
 intents.members = True
 
-client = discord.Client(intents=intents)
-
-# === CONFIGURATION ===
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
 VOICE_CHANNEL_NAME = "GVG"
 TIMEZONE = pytz.timezone("Europe/London")
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
+bot = commands.Bot(command_prefix="!", intents=intents)
+tree = bot.tree
 
-user_sessions = {}  # {username: join_time}
+user_sessions = {}  # username: join_time
 final_log = {}
-has_logged_today = False
+tracking_active = False
 
-def is_tracking_time():
-    now = datetime.datetime.now(TIMEZONE)
-    return (
-        now.hour == 14 and
-        now.weekday() in [3, 6]  # Thursday (3), Sunday (6)
-    )
-
-def is_upload_time():
-    now = datetime.datetime.now(TIMEZONE)
-    return (
-        now.hour == 15 and now.minute == 0 and
-        now.weekday() in [3, 6]
-    )
-
-def now_london():
-    return datetime.datetime.now(TIMEZONE)
 
 def fmt(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
-@client.event
-async def on_ready():
-    print(f"✅ Logged in as {client.user}")
-    client.loop.create_task(schedule_log_delivery())
 
-@client.event
+def now_london():
+    return datetime.datetime.now(TIMEZONE)
+
+
+@bot.event
+async def on_ready():
+    print(f"✅ Logged in as {bot.user}")
+    try:
+        synced = await tree.sync()
+        print(f"✅ Synced {len(synced)} command(s).")
+    except Exception as e:
+        print(f"❌ Error syncing commands: {e}")
+
+
+@tree.command(name="startgvg", description="Start tracking GVG attendance")
+async def startgvg(interaction: discord.Interaction):
+    global tracking_active, user_sessions, final_log
+    tracking_active = True
+    user_sessions = {}
+    final_log = {}
+    await interaction.response.send_message("📢 GVG tracking has started.", ephemeral=True)
+    print("✅ GVG tracking started.")
+
+
+@tree.command(name="endgvg", description="End tracking and send attendance log")
+async def endgvg(interaction: discord.Interaction):
+    global tracking_active
+    tracking_active = False
+    await finalize_log()
+    await send_log_file()
+    await interaction.response.send_message("📋 GVG log has been generated and sent.", ephemeral=True)
+    print("✅ GVG tracking ended and log sent.")
+
+
+@bot.event
 async def on_voice_state_update(member, before, after):
-    if not is_tracking_time():
+    if not tracking_active:
         return
 
     username = str(member)
@@ -81,26 +95,9 @@ async def on_voice_state_update(member, before, after):
             }
             print(f"{username} left at {fmt(now)} — stayed {duration}")
 
-async def schedule_log_delivery():
-    global has_logged_today
-    await client.wait_until_ready()
-
-    while not client.is_closed():
-        now = now_london()
-
-        if is_upload_time() and not has_logged_today:
-            await finalize_log()
-            await send_log_file()
-            has_logged_today = True
-
-        if now.hour == 0 and now.minute == 0:
-            has_logged_today = False
-
-        await asyncio.sleep(60)
 
 async def finalize_log():
-    end_time = datetime.datetime.combine(now_london().date(), datetime.time(15, 0)).replace(tzinfo=TIMEZONE)
-
+    end_time = now_london()
     for username, joined_at in user_sessions.items():
         duration = end_time - joined_at
         final_log[username] = {
@@ -108,15 +105,15 @@ async def finalize_log():
             "Left At": fmt(end_time),
             "Duration": str(duration).split(".")[0]
         }
-
     user_sessions.clear()
+
 
 async def send_log_file():
     if not final_log:
-        print("No users joined the GVG channel today.")
+        print("No users joined the GVG channel.")
         return
 
-    filename = "voice_summary.csv"
+    filename = "gvg_manual_log.csv"
     with open(filename, "w", newline='', encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["User", "Joined At", "Left At", "Duration"])
         writer.writeheader()
@@ -125,10 +122,10 @@ async def send_log_file():
             row.update(data)
             writer.writerow(row)
 
-    channel = client.get_channel(LOG_CHANNEL_ID)
+    channel = bot.get_channel(LOG_CHANNEL_ID)
     if channel:
         await channel.send(
-            content="📋 GVG attendance summary (2–3 PM UK time):",
+            content="📋 Manual GVG attendance log:",
             file=discord.File(fp=filename)
         )
         print("✅ Summary log sent.")
@@ -138,4 +135,5 @@ async def send_log_file():
     os.remove(filename)
     final_log.clear()
 
-client.run(BOT_TOKEN)
+
+bot.run(TOKEN)
