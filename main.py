@@ -51,6 +51,16 @@ async def startgvg(interaction: discord.Interaction):
     tracking_active = True
     user_sessions = {}
     final_log = {}
+
+    # Record users already in the voice channel
+    voice_channel = discord.utils.get(interaction.guild.voice_channels, name=VOICE_CHANNEL_NAME)
+    now = now_london()
+    if voice_channel:
+        for member in voice_channel.members:
+            display_name = member.display_name
+            user_sessions[display_name] = now
+            print(f"{display_name} was already in the channel at {fmt(now)}")
+    
     await interaction.response.send_message("📢 GVG tracking has started.", ephemeral=True)
     print("✅ GVG tracking started.")
 
@@ -117,8 +127,8 @@ async def send_log_file():
     with open(filename, "w", newline='', encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["User", "Joined At", "Left At", "Duration"])
         writer.writeheader()
-        for display_name, data in final_log.items():
-            row = {"User": display_name}
+        for user, data in final_log.items():
+            row = {"User": user}
             row.update(data)
             writer.writerow(row)
 
