@@ -1,6 +1,6 @@
 import discord
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
 import datetime
 import pytz
 import csv
@@ -9,73 +9,63 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# === CONFIGURATION ===
-VOICE_CHANNEL_NAME = "GVG"
-TIMEZONE = pytz.timezone("Europe/London")
-BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
-
 intents = discord.Intents.default()
-intents.guilds = True
 intents.voice_states = True
+intents.guilds = True
 intents.members = True
 
-client = commands.Bot(command_prefix="!", intents=intents)
-tree = app_commands.CommandTree(client)
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
+VOICE_CHANNEL_NAME = "GVG"
+TIMEZONE = pytz.timezone("Europe/London")
 
-user_sessions = {}  # {username: join_time}
+bot = commands.Bot(command_prefix="!", intents=intents)
+tree = bot.tree
+
+user_sessions = {}  # username: join_time
 final_log = {}
 tracking_active = False
 
-def now_london():
-    return datetime.datetime.now(TIMEZONE)
 
 def fmt(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
-@client.event
+
+def now_london():
+    return datetime.datetime.now(TIMEZONE)
+
+
+@bot.event
 async def on_ready():
-    await tree.sync()
-    print(f"✅ Logged in as {client.user}")
+    print(f"✅ Logged in as {bot.user}")
+    try:
+        synced = await tree.sync()
+        print(f"✅ Synced {len(synced)} command(s).")
+    except Exception as e:
+        print(f"❌ Error syncing commands: {e}")
 
-@tree.command(name="start_attendance", description="Start tracking GVG attendance")
-async def start_attendance(interaction: discord.Interaction):
+
+@tree.command(name="startgvg", description="Start tracking GVG attendance")
+async def startgvg(interaction: discord.Interaction):
     global tracking_active, user_sessions, final_log
-
-    if tracking_active:
-        await interaction.response.send_message("⚠️ Tracking is already active.")
-        return
-
     tracking_active = True
-    user_sessions.clear()
-    final_log.clear()
+    user_sessions = {}
+    final_log = {}
+    await interaction.response.send_message("📢 GVG tracking has started.", ephemeral=True)
+    print("✅ GVG tracking started.")
 
-    await interaction.response.send_message("✅ Started tracking attendance.")
 
-    # Capture users already in the voice channel
-    guild = interaction.guild
-    voice_channel = discord.utils.get(guild.voice_channels, name=VOICE_CHANNEL_NAME)
-
-    if voice_channel:
-        now = now_london()
-        for member in voice_channel.members:
-            user_sessions[str(member)] = now
-            print(f"{member} already in voice channel — marked as joined at {fmt(now)}")
-
-@tree.command(name="end_attendance", description="Stop tracking and send CSV log")
-async def end_attendance(interaction: discord.Interaction):
+@tree.command(name="endgvg", description="End tracking and send attendance log")
+async def endgvg(interaction: discord.Interaction):
     global tracking_active
-
-    if not tracking_active:
-        await interaction.response.send_message("⚠️ Tracking is not active.")
-        return
-
+    tracking_active = False
     await finalize_log()
     await send_log_file()
-    tracking_active = False
-    await interaction.response.send_message("📤 Attendance log finalized and sent.")
+    await interaction.response.send_message("📋 GVG log has been generated and sent.", ephemeral=True)
+    print("✅ GVG tracking ended and log sent.")
 
-@client.event
+
+@bot.event
 async def on_voice_state_update(member, before, after):
     if not tracking_active:
         return
@@ -105,8 +95,8 @@ async def on_voice_state_update(member, before, after):
             }
             print(f"{username} left at {fmt(now)} — stayed {duration}")
 
+
 async def finalize_log():
-    # Mark users still in the channel
     end_time = now_london()
     for username, joined_at in user_sessions.items():
         duration = end_time - joined_at
@@ -117,12 +107,13 @@ async def finalize_log():
         }
     user_sessions.clear()
 
+
 async def send_log_file():
     if not final_log:
-        print("No users to log.")
+        print("No users joined the GVG channel.")
         return
 
-    filename = "voice_summary.csv"
+    filename = "gvg_manual_log.csv"
     with open(filename, "w", newline='', encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["User", "Joined At", "Left At", "Duration"])
         writer.writeheader()
@@ -131,17 +122,18 @@ async def send_log_file():
             row.update(data)
             writer.writerow(row)
 
-    channel = client.get_channel(LOG_CHANNEL_ID)
+    channel = bot.get_channel(LOG_CHANNEL_ID)
     if channel:
         await channel.send(
-            content="📋 GVG attendance summary:",
+            content="📋 Manual GVG attendance log:",
             file=discord.File(fp=filename)
         )
-        print("✅ Log sent.")
+        print("✅ Summary log sent.")
     else:
         print("❌ Log channel not found.")
 
     os.remove(filename)
     final_log.clear()
 
-client.run(BOT_TOKEN)
+
+bot.run(TOKEN)
