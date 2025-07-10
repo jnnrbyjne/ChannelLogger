@@ -19,7 +19,7 @@ client = discord.Client(intents=intents)
 VOICE_CHANNEL_NAME = "GVG"
 TIMEZONE = pytz.timezone("Europe/London")
 
-BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
 
 user_sessions = {}  # {username: join_time}
