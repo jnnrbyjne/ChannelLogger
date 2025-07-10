@@ -22,7 +22,7 @@ TIMEZONE = pytz.timezone("Europe/London")
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
-user_sessions = {}  # username: join_time
+user_sessions = {}  # display_name: join_time
 final_log = {}
 tracking_active = False
 
@@ -70,37 +70,37 @@ async def on_voice_state_update(member, before, after):
     if not tracking_active:
         return
 
-    username = str(member)
+    display_name = member.display_name
     now = now_london()
 
     # Joined GVG
     if (after.channel and after.channel.name == VOICE_CHANNEL_NAME and
         (before.channel is None or before.channel.id != after.channel.id)):
 
-        if username not in user_sessions:
-            user_sessions[username] = now
-            print(f"{username} joined at {fmt(now)}")
+        if display_name not in user_sessions:
+            user_sessions[display_name] = now
+            print(f"{display_name} joined at {fmt(now)}")
 
     # Left GVG
     elif (before.channel and before.channel.name == VOICE_CHANNEL_NAME and
           (after.channel is None or after.channel.id != before.channel.id)):
 
-        if username in user_sessions:
-            joined_at = user_sessions.pop(username)
+        if display_name in user_sessions:
+            joined_at = user_sessions.pop(display_name)
             duration = now - joined_at
-            final_log[username] = {
+            final_log[display_name] = {
                 "Joined At": fmt(joined_at),
                 "Left At": fmt(now),
                 "Duration": str(duration).split(".")[0]
             }
-            print(f"{username} left at {fmt(now)} — stayed {duration}")
+            print(f"{display_name} left at {fmt(now)} — stayed {duration}")
 
 
 async def finalize_log():
     end_time = now_london()
-    for username, joined_at in user_sessions.items():
+    for display_name, joined_at in user_sessions.items():
         duration = end_time - joined_at
-        final_log[username] = {
+        final_log[display_name] = {
             "Joined At": fmt(joined_at),
             "Left At": fmt(end_time),
             "Duration": str(duration).split(".")[0]
@@ -117,8 +117,8 @@ async def send_log_file():
     with open(filename, "w", newline='', encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["User", "Joined At", "Left At", "Duration"])
         writer.writeheader()
-        for user, data in final_log.items():
-            row = {"User": user}
+        for display_name, data in final_log.items():
+            row = {"User": display_name}
             row.update(data)
             writer.writerow(row)
 
