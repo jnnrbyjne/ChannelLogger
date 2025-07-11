@@ -18,6 +18,7 @@ TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
 VOICE_CHANNEL_NAME = "GVG"
 TIMEZONE = pytz.timezone("Europe/London")
+ADMIN_ROLE_ID = 1349496161936867359  # <-- Replace with your actual ADMIN role ID
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
@@ -36,7 +37,7 @@ def now_london():
 
 
 def has_admin_role(interaction: discord.Interaction):
-    return any(role.name == "ADMIN" for role in interaction.user.roles)
+    return any(role.id == ADMIN_ROLE_ID for role in interaction.user.roles)
 
 
 @bot.event
@@ -156,7 +157,7 @@ async def send_log_file():
 async def on_app_command_error(interaction: discord.Interaction, error):
     if isinstance(error, app_commands.errors.CheckFailure):
         await interaction.response.send_message(
-            "❌ You don't have permission to use this command (ADMIN role required).",
+            "❌ You don't have permission to use this command.",
             ephemeral=True
         )
 
