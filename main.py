@@ -35,6 +35,10 @@ def now_london():
     return datetime.datetime.now(TIMEZONE)
 
 
+def has_admin_role(interaction: discord.Interaction):
+    return any(role.name == "ADMIN" for role in interaction.user.roles)
+
+
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
@@ -46,26 +50,28 @@ async def on_ready():
 
 
 @tree.command(name="startgvg", description="Start tracking GVG attendance")
+@app_commands.check(has_admin_role)
 async def startgvg(interaction: discord.Interaction):
     global tracking_active, user_sessions, final_log
     tracking_active = True
     user_sessions = {}
     final_log = {}
 
-    # Record users already in the voice channel
-    voice_channel = discord.utils.get(interaction.guild.voice_channels, name=VOICE_CHANNEL_NAME)
-    now = now_london()
+    # Capture users already in the GVG channel
+    guild = interaction.guild
+    voice_channel = discord.utils.get(guild.voice_channels, name=VOICE_CHANNEL_NAME)
     if voice_channel:
+        now = now_london()
         for member in voice_channel.members:
-            display_name = member.display_name
-            user_sessions[display_name] = now
-            print(f"{display_name} was already in the channel at {fmt(now)}")
-    
+            user_sessions[member.display_name] = now
+            print(f"{member.display_name} was already in channel at {fmt(now)}")
+
     await interaction.response.send_message("📢 GVG tracking has started.", ephemeral=True)
     print("✅ GVG tracking started.")
 
 
 @tree.command(name="endgvg", description="End tracking and send attendance log")
+@app_commands.check(has_admin_role)
 async def endgvg(interaction: discord.Interaction):
     global tracking_active
     tracking_active = False
@@ -145,5 +151,13 @@ async def send_log_file():
     os.remove(filename)
     final_log.clear()
 
+
+@tree.error
+async def on_app_command_error(interaction: discord.Interaction, error):
+    if isinstance(error, app_commands.errors.CheckFailure):
+        await interaction.response.send_message(
+            "❌ You don't have permission to use this command (ADMIN role required).",
+            ephemeral=True
+        )
 
 bot.run(TOKEN)
