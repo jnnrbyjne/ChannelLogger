@@ -35,20 +35,6 @@ def now_london():
     return datetime.datetime.now(TIMEZONE)
 
 
-def tracking_window_for_today():
-    now = now_london()
-    weekday = now.weekday()  # Monday = 0, Sunday = 6
-    if weekday in [3, 6]:  # Thursday or Sunday
-        start = now.replace(hour=14, minute=0, second=0, microsecond=0)
-        end = now.replace(hour=15, minute=0, second=0, microsecond=0)
-        return start, end
-    return None, None
-
-
-def is_tracking_day():
-    weekday = now_london().weekday()
-    return weekday in [3, 6]  # Thursday or Sunday
-
 
 def has_admin_role(interaction: discord.Interaction):
     return any(role.id == ADMIN_ROLE_ID for role in interaction.user.roles)
