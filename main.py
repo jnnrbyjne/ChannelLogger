@@ -7,33 +7,36 @@ import csv
 import os
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
+# Intents
 intents = discord.Intents.default()
 intents.voice_states = True
 intents.guilds = True
 intents.members = True
 
+# Config
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
 VOICE_CHANNEL_NAME = "GVG"
 TIMEZONE = pytz.timezone("Europe/London")
-ADMIN_ROLE_ID = 1349496161936867359  # Replace with your actual role ID
+ADMIN_ROLE_ID = 1349496161936867359  # Replace with actual Admin role ID
 
+# Bot setup
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
-user_sessions = {}  # display_name: list of (join, leave) tuples
+# State
+user_sessions = {}
 tracking_active = False
 
-
+# Helpers
 def fmt(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
-
 def now_london():
     return datetime.datetime.now(TIMEZONE)
-
 
 def tracking_window_for_today():
     now = now_london()
@@ -44,16 +47,10 @@ def tracking_window_for_today():
         return start, end
     return None, None
 
-
-def is_tracking_day():
-    weekday = now_london().weekday()
-    return weekday in [3, 6]  # Thursday or Sunday
-
-
-def has_admin_role(interaction: discord.Interaction):
+def has_admin_role(interaction: discord.Interaction) -> bool:
     return any(role.id == ADMIN_ROLE_ID for role in interaction.user.roles)
 
-
+# Events
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
@@ -63,7 +60,7 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
 
-
+# Slash Commands
 @tree.command(name="startgvg", description="Start tracking GVG attendance")
 @app_commands.check(has_admin_role)
 async def startgvg(interaction: discord.Interaction):
@@ -74,6 +71,7 @@ async def startgvg(interaction: discord.Interaction):
     guild = interaction.guild
     voice_channel = discord.utils.get(guild.voice_channels, name=VOICE_CHANNEL_NAME)
     now = now_london()
+
     if voice_channel:
         for member in voice_channel.members:
             user_sessions[member.display_name] = [(now, None)]
@@ -81,7 +79,6 @@ async def startgvg(interaction: discord.Interaction):
 
     await interaction.response.send_message("📢 GVG tracking has started.", ephemeral=True)
     print("✅ GVG tracking started.")
-
 
 @tree.command(name="endgvg", description="End tracking and send attendance log")
 @app_commands.check(has_admin_role)
@@ -92,7 +89,17 @@ async def endgvg(interaction: discord.Interaction):
     await interaction.response.send_message("📋 GVG log has been generated and sent.", ephemeral=True)
     print("✅ GVG tracking ended and log sent.")
 
+@tree.command(name="sync", description="Force sync slash commands")
+async def sync(interaction: discord.Interaction):
+    try:
+        synced = await tree.sync()
+        await interaction.response.send_message(f"✅ Synced {len(synced)} command(s).", ephemeral=True)
+        print(f"✅ Synced {len(synced)} command(s).")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Failed to sync commands: {e}", ephemeral=True)
+        print(f"❌ Failed to sync commands: {e}")
 
+# Voice State Tracking
 @bot.event
 async def on_voice_state_update(member, before, after):
     if not tracking_active:
@@ -116,7 +123,7 @@ async def on_voice_state_update(member, before, after):
             user_sessions[name][-1] = (user_sessions[name][-1][0], now)
             print(f"{name} left at {fmt(now)}")
 
-
+# Log Generation
 async def finalize_log():
     now = now_london()
     start, end = tracking_window_for_today()
@@ -129,13 +136,11 @@ async def finalize_log():
                 leave = now
 
             if start and end:
-                # Only count time within 2–3 PM on Thursday or Sunday
                 join_clamped = max(join, start)
                 leave_clamped = min(leave, end)
                 if join_clamped < leave_clamped:
                     total_time += (leave_clamped - join_clamped)
             else:
-                # Count full session on other days
                 total_time += (leave - join)
 
         if total_time.total_seconds() > 0:
@@ -149,7 +154,6 @@ async def finalize_log():
         await send_log_file(final_log)
     else:
         print("ℹ️ No valid attendance to log.")
-
 
 async def send_log_file(log_data):
     filename = "gvg_manual_log.csv"
@@ -173,7 +177,7 @@ async def send_log_file(log_data):
 
     os.remove(filename)
 
-
+# Error Handling
 @tree.error
 async def on_app_command_error(interaction: discord.Interaction, error):
     if isinstance(error, app_commands.errors.CheckFailure):
@@ -181,6 +185,11 @@ async def on_app_command_error(interaction: discord.Interaction, error):
             "❌ You don't have permission to use this command (ADMIN role required).",
             ephemeral=True
         )
+    else:
+        await interaction.response.send_message(
+            f"⚠️ An error occurred: {error}", ephemeral=True
+        )
+        print(f"⚠️ Unhandled command error: {error}")
 
-
+# Start the bot
 bot.run(TOKEN)
