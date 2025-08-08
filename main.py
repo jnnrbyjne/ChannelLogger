@@ -5,10 +5,21 @@ import datetime
 import pytz
 import csv
 import os
+import asyncio
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
+VOICE_CHANNEL_NAME = "GVG"
+TIMEZONE = pytz.timezone("Europe/London")
+ADMIN_ROLE_ID = 1349496161936867359  # Replace with your admin role ID
+TEST_GUILD_ID = 1349495299311144960   # 🔁 Replace with your Discord server ID
+
+# Debug environment variable load
+print(f"🔑 TOKEN loaded? {'Yes' if TOKEN else 'No'}")
+print(f"📺 LOG_CHANNEL_ID: {LOG_CHANNEL_ID}")
 
 # Intents
 intents = discord.Intents.default()
@@ -16,22 +27,13 @@ intents.voice_states = True
 intents.guilds = True
 intents.members = True
 
-# Config
-TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
-VOICE_CHANNEL_NAME = "GVG"
-TIMEZONE = pytz.timezone("Europe/London")
-ADMIN_ROLE_ID = 1349496161936867359  # Replace with actual Admin role ID
-
 # Bot setup
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
-
-# State
 user_sessions = {}
 tracking_active = False
 
-# Helpers
+# Time helpers
 def fmt(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -40,8 +42,7 @@ def now_london():
 
 def tracking_window_for_today():
     now = now_london()
-    weekday = now.weekday()  # Monday = 0, Sunday = 6
-    if weekday in [3, 6]:  # Thursday or Sunday
+    if now.weekday() in [3, 6]:  # Thursday or Sunday
         start = now.replace(hour=14, minute=0, second=0, microsecond=0)
         end = now.replace(hour=15, minute=0, second=0, microsecond=0)
         return start, end
@@ -53,10 +54,14 @@ def has_admin_role(interaction: discord.Interaction) -> bool:
 # Events
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+    await asyncio.sleep(3)
+
     try:
-        synced = await tree.sync()
-        print(f"✅ Synced {len(synced)} command(s).")
+        guild = discord.Object(id=TEST_GUILD_ID)
+        await tree.copy_global_to(guild=guild)
+        synced = await tree.sync(guild=guild)
+        print(f"✅ Synced {len(synced)} command(s) to guild {TEST_GUILD_ID}")
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
 
@@ -75,10 +80,10 @@ async def startgvg(interaction: discord.Interaction):
     if voice_channel:
         for member in voice_channel.members:
             user_sessions[member.display_name] = [(now, None)]
-            print(f"{member.display_name} was already in channel at {fmt(now)}")
+            print(f"{member.display_name} already in voice at {fmt(now)}")
 
-    await interaction.response.send_message("📢 GVG tracking has started.", ephemeral=True)
-    print("✅ GVG tracking started.")
+    await interaction.response.send_message("📢 GVG tracking started.", ephemeral=True)
+    print("✅ Tracking started.")
 
 @tree.command(name="endgvg", description="End tracking and send attendance log")
 @app_commands.check(has_admin_role)
@@ -86,20 +91,21 @@ async def endgvg(interaction: discord.Interaction):
     global tracking_active
     tracking_active = False
     await finalize_log()
-    await interaction.response.send_message("📋 GVG log has been generated and sent.", ephemeral=True)
-    print("✅ GVG tracking ended and log sent.")
+    await interaction.response.send_message("📋 GVG log sent.", ephemeral=True)
+    print("✅ Tracking ended.")
 
-@tree.command(name="sync", description="Force sync slash commands")
+@tree.command(name="sync", description="Force sync commands")
 async def sync(interaction: discord.Interaction):
     try:
-        synced = await tree.sync()
-        await interaction.response.send_message(f"✅ Synced {len(synced)} command(s).", ephemeral=True)
-        print(f"✅ Synced {len(synced)} command(s).")
+        guild = discord.Object(id=TEST_GUILD_ID)
+        synced = await tree.sync(guild=guild)
+        await interaction.response.send_message(f"✅ Synced {len(synced)} commands.", ephemeral=True)
+        print(f"✅ Slash commands manually synced.")
     except Exception as e:
-        await interaction.response.send_message(f"❌ Failed to sync commands: {e}", ephemeral=True)
-        print(f"❌ Failed to sync commands: {e}")
+        await interaction.response.send_message(f"❌ Sync failed: {e}", ephemeral=True)
+        print(f"❌ Sync failed: {e}")
 
-# Voice State Tracking
+# Voice State
 @bot.event
 async def on_voice_state_update(member, before, after):
     if not tracking_active:
@@ -153,7 +159,7 @@ async def finalize_log():
     if final_log:
         await send_log_file(final_log)
     else:
-        print("ℹ️ No valid attendance to log.")
+        print("ℹ️ No attendance to log.")
 
 async def send_log_file(log_data):
     filename = "gvg_manual_log.csv"
@@ -167,10 +173,7 @@ async def send_log_file(log_data):
 
     channel = bot.get_channel(LOG_CHANNEL_ID)
     if channel:
-        await channel.send(
-            content="📋 GVG attendance log:",
-            file=discord.File(fp=filename)
-        )
+        await channel.send(content="📋 GVG attendance log:", file=discord.File(fp=filename))
         print("✅ Log sent.")
     else:
         print("❌ Log channel not found.")
@@ -182,14 +185,15 @@ async def send_log_file(log_data):
 async def on_app_command_error(interaction: discord.Interaction, error):
     if isinstance(error, app_commands.errors.CheckFailure):
         await interaction.response.send_message(
-            "❌ You don't have permission to use this command (ADMIN role required).",
+            "❌ You don't have permission to use this command.",
             ephemeral=True
         )
     else:
         await interaction.response.send_message(
             f"⚠️ An error occurred: {error}", ephemeral=True
         )
-        print(f"⚠️ Unhandled command error: {error}")
+        print(f"⚠️ Command error: {error}")
 
 # Start the bot
+print("🚀 Starting bot...")
 bot.run(TOKEN)
