@@ -182,4 +182,10 @@ def run():
 
 Thread(target=run).start()
 
+@tree.command(name="sync", description="Force sync commands")
+async def sync(interaction: discord.Interaction):
+    await tree.sync()
+    await interaction.response.send_message("✅ Slash commands synced!", ephemeral=True)
+
+
 bot.run(TOKEN)
