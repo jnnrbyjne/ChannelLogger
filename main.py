@@ -71,6 +71,9 @@ async def startgvg(interaction: discord.Interaction):
     tracking_active = True
     user_sessions = {}
 
+    await interaction.response.send_message("📢 GVG tracking has started.", ephemeral=True)  # RESPOND FIRST
+
+    # Then continue the logic
     guild = interaction.guild
     voice_channel = discord.utils.get(guild.voice_channels, name=VOICE_CHANNEL_NAME)
     now = now_london()
@@ -79,7 +82,6 @@ async def startgvg(interaction: discord.Interaction):
             user_sessions[member.display_name] = [(now, None)]
             print(f"{member.display_name} was already in channel at {fmt(now)}")
 
-    await interaction.response.send_message("📢 GVG tracking has started.", ephemeral=True)
     print("✅ GVG tracking started.")
 
 
