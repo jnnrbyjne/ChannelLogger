@@ -90,9 +90,14 @@ async def startgvg(interaction: discord.Interaction):
 async def endgvg(interaction: discord.Interaction):
     global tracking_active
     tracking_active = False
+
+    # Immediately acknowledge the interaction
+    await interaction.response.send_message("🛑 Ending GVG tracking... generating log.", ephemeral=True)
+
+    # Then continue processing in the background
     await finalize_log()
-    await interaction.response.send_message("📋 GVG log has been generated and sent.", ephemeral=True)
     print("✅ GVG tracking ended and log sent.")
+
 
 
 @bot.event
