@@ -185,7 +185,6 @@ await interaction.response.send_message(
 ephemeral=True
 )
 
-bot.run(TOKEN)
 
 from flask import Flask
 from threading import Thread
