@@ -1,6 +1,6 @@
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks  # added tasks import
 import datetime
 import pytz
 import csv
@@ -54,6 +54,14 @@ def has_admin_role(interaction: discord.Interaction):
     return any(role.id == ADMIN_ROLE_ID for role in interaction.user.roles)
 
 
+# ------------------ KEEP-ALIVE TASK ------------------
+@tasks.loop(minutes=5)
+async def keep_alive():
+    """Logs a heartbeat to keep the bot active on Render."""
+    print(f"⏳ Keep-alive ping at {fmt(now_london())}")
+# ------------------------------------------------------
+
+
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
@@ -62,6 +70,8 @@ async def on_ready():
         print(f"✅ Synced {len(synced)} command(s).")
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
+
+    keep_alive.start()  # start background keep-alive loop
 
 
 @tree.command(name="startgvg", description="Start tracking GVG attendance")
@@ -129,13 +139,11 @@ async def finalize_log():
                 leave = now
 
             if start and end:
-                # Only count time within 2–3 PM on Thursday or Sunday
                 join_clamped = max(join, start)
                 leave_clamped = min(leave, end)
                 if join_clamped < leave_clamped:
                     total_time += (leave_clamped - join_clamped)
             else:
-                # Count full session on other days
                 total_time += (leave - join)
 
         if total_time.total_seconds() > 0:
